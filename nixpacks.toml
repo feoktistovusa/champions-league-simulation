@@ -1,5 +1,9 @@
+[variables]
+APP_ENV = 'production'
+APP_DEBUG = 'false'
+
 [phases.setup]
-nixPkgs = ['...', 'nodejs_18']
+nixPkgs = ['...', 'nodejs_18', 'phpPackages.composer']
 
 [phases.install]
 cmds = [
@@ -10,6 +14,7 @@ cmds = [
 
 [phases.build]
 cmds = [
+    'cp .env.production .env',
     'bash post-install.sh'
 ]
 
