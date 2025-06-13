@@ -7,6 +7,7 @@ cat > .env << 'EOF'
 APP_NAME="Champions League Simulation"
 APP_ENV=production
 APP_DEBUG=false
+APP_KEY=
 APP_URL=${RAILWAY_PUBLIC_DOMAIN:-http://localhost}
 
 LOG_CHANNEL=stderr
