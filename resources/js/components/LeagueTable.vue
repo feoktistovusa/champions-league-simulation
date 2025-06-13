@@ -27,7 +27,7 @@
         >
           <td class="py-3 px-2 text-left">{{ index + 1 }}</td>
           <td class="py-3 px-4 text-left font-medium">
-            {{ standing.team.name }}
+            {{ standing.team?.name || 'Unknown Team' }}
           </td>
           <td class="py-3 px-2 text-center">{{ standing.played }}</td>
           <td class="py-3 px-2 text-center">{{ standing.won }}</td>

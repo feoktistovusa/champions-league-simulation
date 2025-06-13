@@ -11,7 +11,7 @@
     >
       <div class="flex items-center justify-between">
         <div class="flex-1 text-right font-medium">
-          {{ match.home_team.name }}
+          {{ match.home_team?.name || 'Unknown Team' }}
         </div>
         <div class="px-4 text-center">
           <template v-if="match.played && !editingMatch[match.id]">
@@ -43,7 +43,7 @@
           </template>
         </div>
         <div class="flex-1 text-left font-medium">
-          {{ match.away_team.name }}
+          {{ match.away_team?.name || 'Unknown Team' }}
         </div>
       </div>
       

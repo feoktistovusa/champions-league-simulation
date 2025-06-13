@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\GameMatch;
-use App\Models\Standing;
+use App\Http\Resources\StandingResource;
+use App\Repositories\Contracts\MatchRepositoryInterface;
+use App\Repositories\Contracts\StandingRepositoryInterface;
 use App\Services\FixtureGenerator;
 use App\Services\PredictionService;
+use Illuminate\Http\JsonResponse;
 
 class LeagueController extends Controller
 {
@@ -13,10 +15,20 @@ class LeagueController extends Controller
 
     protected FixtureGenerator $fixtureGenerator;
 
-    public function __construct(PredictionService $predictionService, FixtureGenerator $fixtureGenerator)
-    {
+    protected StandingRepositoryInterface $standingRepository;
+
+    protected MatchRepositoryInterface $matchRepository;
+
+    public function __construct(
+        PredictionService $predictionService,
+        FixtureGenerator $fixtureGenerator,
+        StandingRepositoryInterface $standingRepository,
+        MatchRepositoryInterface $matchRepository
+    ) {
         $this->predictionService = $predictionService;
         $this->fixtureGenerator = $fixtureGenerator;
+        $this->standingRepository = $standingRepository;
+        $this->matchRepository = $matchRepository;
     }
 
     public function index()
@@ -24,64 +36,51 @@ class LeagueController extends Controller
         return view('league.index');
     }
 
-    public function getStandings()
+    public function getStandings(): JsonResponse
     {
-        $standings = Standing::with('team')
-            ->orderBy('points', 'desc')
-            ->orderBy('goal_difference', 'desc')
-            ->orderBy('goals_for', 'desc')
-            ->get();
-
-        return response()->json($standings);
-    }
-
-    public function getCurrentWeek()
-    {
-        $playedMatches = GameMatch::where('played', true)->count();
-        $matchesPerWeek = 2;
-
-        $currentWeek = ceil($playedMatches / $matchesPerWeek) + 1;
-        $totalWeeks = 6;
-
-        if ($currentWeek > $totalWeeks) {
-            $currentWeek = $totalWeeks;
-        }
+        $standings = $this->standingRepository->getLeagueStandings();
 
         return response()->json([
-            'current_week' => $currentWeek,
-            'total_weeks' => $totalWeeks,
-            'all_matches_played' => $playedMatches === GameMatch::count(),
+            'data' => StandingResource::collection($standings),
         ]);
     }
 
-    public function getPredictions()
+    public function getCurrentWeek(): JsonResponse
     {
-        $currentWeek = $this->getCurrentWeek()->getData()->current_week;
+        $weekData = $this->matchRepository->getCurrentWeek();
+
+        return response()->json([
+            'data' => $weekData,
+        ]);
+    }
+
+    public function getPredictions(): JsonResponse
+    {
+        $weekData = $this->matchRepository->getCurrentWeek();
+        $currentWeek = $weekData['current_week'];
 
         if ($currentWeek <= 4) {
-            return response()->json([]);
+            return response()->json([
+                'data' => [],
+            ]);
         }
 
         $predictions = $this->predictionService->calculateChampionshipProbabilities();
 
-        return response()->json($predictions);
+        return response()->json([
+            'data' => $predictions,
+        ]);
     }
 
-    public function resetLeague()
+    public function resetLeague(): JsonResponse
     {
-        Standing::query()->update([
-            'played' => 0,
-            'won' => 0,
-            'drawn' => 0,
-            'lost' => 0,
-            'goals_for' => 0,
-            'goals_against' => 0,
-            'goal_difference' => 0,
-            'points' => 0,
-        ]);
-
+        $this->standingRepository->resetAll();
         $this->fixtureGenerator->generateFixtures();
 
-        return response()->json(['message' => 'League reset successfully']);
+        return response()->json([
+            'data' => [
+                'message' => 'League reset successfully',
+            ],
+        ]);
     }
 }

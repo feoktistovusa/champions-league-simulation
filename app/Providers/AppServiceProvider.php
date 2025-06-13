@@ -2,8 +2,8 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -20,10 +20,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (config('database.default') === 'sqlite' && !file_exists(database_path('database.sqlite'))) {
+        if (config('database.default') === 'sqlite' && ! file_exists(database_path('database.sqlite'))) {
             touch(database_path('database.sqlite'));
         }
-        
+
         if (config('app.env') === 'production') {
             URL::forceScheme('https');
         }

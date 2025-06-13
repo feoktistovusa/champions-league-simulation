@@ -28,20 +28,22 @@ class LeagueApiTest extends TestCase
         $response = $this->getJson('/api/standings');
 
         $response->assertStatus(200)
-            ->assertJsonCount(4)
+            ->assertJsonCount(4, 'data')
             ->assertJsonStructure([
-                '*' => [
-                    'id',
-                    'team_id',
-                    'played',
-                    'won',
-                    'drawn',
-                    'lost',
-                    'goals_for',
-                    'goals_against',
-                    'goal_difference',
-                    'points',
-                    'team' => ['id', 'name', 'strength'],
+                'data' => [
+                    '*' => [
+                        'id',
+                        'team_id',
+                        'played',
+                        'won',
+                        'drawn',
+                        'lost',
+                        'goals_for',
+                        'goals_against',
+                        'goal_difference',
+                        'points',
+                        'team' => ['id', 'name', 'strength', 'logo'],
+                    ],
                 ],
             ]);
     }
@@ -61,14 +63,18 @@ class LeagueApiTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'current_week',
-                'total_weeks',
-                'all_matches_played',
+                'data' => [
+                    'current_week',
+                    'total_weeks',
+                    'all_matches_played',
+                ],
             ])
             ->assertJson([
-                'current_week' => 1,
-                'total_weeks' => 6,
-                'all_matches_played' => false,
+                'data' => [
+                    'current_week' => 1,
+                    'total_weeks' => 6,
+                    'all_matches_played' => false,
+                ],
             ]);
     }
 
@@ -87,16 +93,18 @@ class LeagueApiTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                '*' => [
-                    'id',
-                    'home_team_id',
-                    'away_team_id',
-                    'home_score',
-                    'away_score',
-                    'week',
-                    'played',
-                    'home_team' => ['id', 'name'],
-                    'away_team' => ['id', 'name'],
+                'data' => [
+                    '*' => [
+                        'id',
+                        'home_team_id',
+                        'away_team_id',
+                        'home_score',
+                        'away_score',
+                        'week',
+                        'played',
+                        'home_team' => ['id', 'name', 'strength', 'logo'],
+                        'away_team' => ['id', 'name', 'strength', 'logo'],
+                    ],
                 ],
             ]);
     }
@@ -115,7 +123,7 @@ class LeagueApiTest extends TestCase
         $response = $this->postJson('/api/simulate-week', ['week' => 1]);
 
         $response->assertStatus(200)
-            ->assertJson(['message' => 'Week simulated successfully']);
+            ->assertJson(['data' => ['message' => 'Week simulated successfully']]);
 
         // Check that match was played
         $this->assertDatabaseHas('matches', [
@@ -129,7 +137,7 @@ class LeagueApiTest extends TestCase
         $response = $this->postJson('/api/reset-league');
 
         $response->assertStatus(200)
-            ->assertJson(['message' => 'League reset successfully']);
+            ->assertJson(['data' => ['message' => 'League reset successfully']]);
 
         // Check standings are reset
         $this->assertDatabaseHas('standings', [

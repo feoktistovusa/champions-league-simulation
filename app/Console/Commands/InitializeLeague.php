@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Console\Commands;
 
 use App\Services\FixtureGenerator;
@@ -22,14 +24,27 @@ class InitializeLeague extends Command
     protected $description = 'Initialize the league with fixtures';
 
     /**
+     * FixtureGenerator service
+     */
+    protected FixtureGenerator $fixtureGenerator;
+
+    /**
+     * Create a new command instance
+     */
+    public function __construct(FixtureGenerator $fixtureGenerator)
+    {
+        parent::__construct();
+        $this->fixtureGenerator = $fixtureGenerator;
+    }
+
+    /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
         $this->info('Initializing league fixtures...');
 
-        $fixtureGenerator = new FixtureGenerator;
-        $fixtures = $fixtureGenerator->generateFixtures();
+        $fixtures = $this->fixtureGenerator->generateFixtures();
 
         $this->info('Generated '.$fixtures->count().' fixtures successfully!');
 

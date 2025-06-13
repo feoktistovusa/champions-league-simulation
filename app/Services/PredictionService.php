@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Models\GameMatch;
@@ -7,35 +9,53 @@ use App\Models\Standing;
 use App\Models\Team;
 use Illuminate\Database\Eloquent\Collection;
 
+/**
+ * Class PredictionService
+ *
+ * Handles championship probability calculations using Monte Carlo simulation
+ */
 class PredictionService
 {
+    /**
+     * Number of simulations to run for probability calculation
+     */
+    private const SIMULATION_COUNT = 10000;
+
+    /**
+     * Calculate championship probabilities for all teams
+     *
+     * @return array<int, array{team: Team, probability: float}>
+     */
     public function calculateChampionshipProbabilities(): array
     {
+        /** @var Collection<int, Team> $teams */
         $teams = Team::with('standing')->get();
+        /** @var Collection<int, GameMatch> $remainingMatches */
         $remainingMatches = GameMatch::where('played', false)->get();
 
         if ($remainingMatches->isEmpty()) {
             return $this->getCurrentProbabilities();
         }
 
-        $simulations = 10000;
         $winCounts = [];
 
         foreach ($teams as $team) {
             $winCounts[$team->id] = 0;
         }
 
-        for ($i = 0; $i < $simulations; $i++) {
+        for ($i = 0; $i < self::SIMULATION_COUNT; $i++) {
             $simulatedStandings = $this->simulateSeason($teams, $remainingMatches);
             $winner = $simulatedStandings->first();
-            $winCounts[$winner->team_id]++;
+            if ($winner !== null && $winner instanceof Standing) {
+                $winCounts[$winner->team_id]++;
+            }
         }
 
         $probabilities = [];
         foreach ($teams as $team) {
             $probabilities[] = [
                 'team' => $team,
-                'probability' => round(($winCounts[$team->id] / $simulations) * 100, 2),
+                'probability' => round(($winCounts[$team->id] / self::SIMULATION_COUNT) * 100, 2),
             ];
         }
 
@@ -54,25 +74,49 @@ class PredictionService
             ->orderBy('goals_for', 'desc')
             ->get();
 
+        if ($standings->isEmpty()) {
+            return [];
+        }
+
         $probabilities = [];
-        $first = true;
+        $topPoints = $standings->first()->points;
+        $topGoalDifference = $standings->first()->goal_difference;
+        $topGoalsFor = $standings->first()->goals_for;
+        $topTeams = $standings->filter(function ($standing) use ($topPoints, $topGoalDifference, $topGoalsFor) {
+            return $standing->points === $topPoints &&
+                   $standing->goal_difference === $topGoalDifference &&
+                   $standing->goals_for === $topGoalsFor;
+        });
+
+        $winnerProbability = $topTeams->count() > 1 ? round(100 / $topTeams->count(), 2) : 100;
 
         foreach ($standings as $standing) {
+            $isWinner = $standing->points === $topPoints &&
+                       $standing->goal_difference === $topGoalDifference &&
+                       $standing->goals_for === $topGoalsFor;
+
             $probabilities[] = [
                 'team' => $standing->team,
-                'probability' => $first ? 100 : 0,
+                'probability' => $isWinner ? $winnerProbability : 0,
             ];
-            $first = false;
         }
 
         return $probabilities;
     }
 
+    /**
+     * Simulate the remaining season for probability calculation
+     *
+     * @param  Collection<int, Team>  $teams
+     * @param  Collection<int, GameMatch>  $remainingMatches
+     * @return Collection<int, \Illuminate\Database\Eloquent\Model>
+     */
     private function simulateSeason(Collection $teams, Collection $remainingMatches): Collection
     {
         $simulatedStandings = [];
 
         foreach ($teams as $team) {
+            /** @var Standing $standing */
             $standing = clone $team->standing;
             $standing->team_id = $team->id;
             $simulatedStandings[$team->id] = $standing;
@@ -112,14 +156,23 @@ class PredictionService
         $awayStrength = $awayTeam->strength;
 
         $totalStrength = $homeStrength + $awayStrength;
-        $homeWinProb = $homeStrength / $totalStrength;
+
+        if ($totalStrength == 0) {
+            $baseHomeWinProb = 0.5;
+            $baseAwayWinProb = 0.5;
+        } else {
+            $baseHomeWinProb = $homeStrength / $totalStrength;
+            $baseAwayWinProb = $awayStrength / $totalStrength;
+        }
         $drawProb = 0.25;
+        $homeWinProb = $baseHomeWinProb * (1 - $drawProb);
+        $awayWinProb = $baseAwayWinProb * (1 - $drawProb);
 
         $random = mt_rand() / mt_getrandmax();
 
-        if ($random < $homeWinProb * (1 - $drawProb)) {
+        if ($random < $homeWinProb) {
             return ['home' => mt_rand(1, 4), 'away' => mt_rand(0, 2)];
-        } elseif ($random < (1 - $drawProb)) {
+        } elseif ($random < $homeWinProb + $awayWinProb) {
             return ['home' => mt_rand(0, 2), 'away' => mt_rand(1, 4)];
         } else {
             $drawScore = mt_rand(0, 3);

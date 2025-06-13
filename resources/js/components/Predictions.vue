@@ -6,15 +6,15 @@
       class="flex items-center justify-between"
     >
       <div class="flex items-center space-x-3">
-        <span class="text-lg font-medium">{{ prediction.team.name }}</span>
+        <span class="text-lg font-medium">{{ prediction.team?.name || 'Unknown Team' }}</span>
       </div>
       <div class="flex items-center space-x-3">
         <div class="w-48 bg-gray-200 rounded-full h-6 relative">
           <div
             class="bg-blue-600 h-6 rounded-full flex items-center justify-end pr-2 text-white text-sm font-semibold"
-            :style="{ width: prediction.probability + '%' }"
+            :style="{ width: (prediction.probability || 0) + '%' }"
           >
-            {{ prediction.probability }}%
+            {{ prediction.probability || 0 }}%
           </div>
         </div>
       </div>

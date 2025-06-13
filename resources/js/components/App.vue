@@ -9,7 +9,10 @@
         <!-- League Table -->
         <div class="bg-white rounded-lg shadow-lg p-6">
           <h2 class="text-2xl font-semibold mb-4">League Table</h2>
-          <LeagueTable :standings="standings" />
+          <div v-if="!Array.isArray(standings) || standings.length === 0" class="text-gray-500 text-center py-4">
+            Loading standings...
+          </div>
+          <LeagueTable v-else :standings="standings" />
         </div>
 
         <!-- Match Results -->
@@ -35,7 +38,11 @@
               </button>
             </div>
           </div>
+          <div v-if="!Array.isArray(currentWeekMatches) || currentWeekMatches.length === 0" class="text-gray-500 text-center py-4">
+            No matches for this week
+          </div>
           <MatchResults 
+            v-else
             :matches="currentWeekMatches" 
             @update-match="handleUpdateMatch"
           />
@@ -100,51 +107,60 @@ export default {
     const displayWeek = ref(1);
 
     const currentWeekMatches = computed(() => {
-      return matches.value.filter(match => match.week === displayWeek.value);
+      if (!Array.isArray(matches.value)) return [];
+      return matches.value.filter(match => match?.week === displayWeek.value);
     });
 
     const fetchStandings = async () => {
       try {
         const response = await axios.get('/api/standings');
-        standings.value = response.data;
+        standings.value = response.data.data || [];
       } catch (error) {
         console.error('Error fetching standings:', error);
+        standings.value = [];
       }
     };
 
     const fetchMatches = async () => {
       try {
         const response = await axios.get('/api/matches');
-        matches.value = response.data;
+        matches.value = response.data.data || [];
       } catch (error) {
         console.error('Error fetching matches:', error);
+        matches.value = [];
       }
     };
 
     const fetchCurrentWeek = async () => {
       try {
         const response = await axios.get('/api/current-week');
-        currentWeek.value = response.data.current_week;
-        totalWeeks.value = response.data.total_weeks;
-        allMatchesPlayed.value = response.data.all_matches_played;
+        const data = response.data.data || response.data;
+        currentWeek.value = data.current_week || 1;
+        totalWeeks.value = data.total_weeks || 6;
+        allMatchesPlayed.value = data.all_matches_played || false;
         displayWeek.value = Math.min(currentWeek.value, totalWeeks.value);
       } catch (error) {
         console.error('Error fetching current week:', error);
+        currentWeek.value = 1;
+        totalWeeks.value = 6;
+        allMatchesPlayed.value = false;
+        displayWeek.value = 1;
       }
     };
 
     const fetchPredictions = async () => {
       try {
         const response = await axios.get('/api/predictions');
-        predictions.value = response.data;
+        predictions.value = response.data.data || [];
       } catch (error) {
         console.error('Error fetching predictions:', error);
+        predictions.value = [];
       }
     };
 
     const simulateWeek = async () => {
       try {
-        await axios.post('/api/simulate-week', { week: currentWeek.value });
+        await axios.post('/api/simulate-week');
         await fetchAll();
       } catch (error) {
         console.error('Error simulating week:', error);
