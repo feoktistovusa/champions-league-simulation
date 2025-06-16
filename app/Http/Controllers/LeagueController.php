@@ -56,10 +56,19 @@ class LeagueController extends Controller
 
     public function getPredictions(): JsonResponse
     {
-        $weekData = $this->matchRepository->getCurrentWeek();
-        $currentWeek = $weekData['current_week'];
+        $highestPlayedWeek = 0;
+        for ($week = 1; $week <= 6; $week++) {
+            $weekMatches = $this->matchRepository->getByWeek($week);
+            $playedInWeek = $weekMatches->where('played', true)->count();
 
-        if ($currentWeek <= 4) {
+            if ($weekMatches->count() > 0 && $playedInWeek === $weekMatches->count()) {
+                $highestPlayedWeek = $week;
+            } else {
+                break;
+            }
+        }
+
+        if ($highestPlayedWeek < 4) {
             return response()->json([
                 'data' => [],
             ]);

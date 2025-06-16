@@ -53,6 +53,11 @@ class MatchRepository implements MatchRepositoryInterface
         return $this->model->count();
     }
 
+    public function getPlayedMatchesCount(): int
+    {
+        return $this->model->where('played', true)->count();
+    }
+
     public function truncate(): void
     {
         $this->model->truncate();

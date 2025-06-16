@@ -43,6 +43,11 @@ interface MatchRepositoryInterface
     public function count(): int;
 
     /**
+     * Count played matches
+     */
+    public function getPlayedMatchesCount(): int;
+
+    /**
      * Delete all matches
      */
     public function truncate(): void;

@@ -5,7 +5,7 @@
         Champions League Simulation
       </h1>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <!-- League Table -->
         <div class="bg-white rounded-lg shadow-lg p-6">
           <h2 class="text-2xl font-semibold mb-4">League Table</h2>
@@ -41,23 +41,28 @@
           <div v-if="!Array.isArray(currentWeekMatches) || currentWeekMatches.length === 0" class="text-gray-500 text-center py-4">
             No matches for this week
           </div>
-          <MatchResults 
+          <MatchResults
             v-else
-            :matches="currentWeekMatches" 
+            :matches="currentWeekMatches"
             @update-match="handleUpdateMatch"
           />
         </div>
-      </div>
 
-      <!-- Predictions (shown after week 4) -->
-      <div v-if="currentWeek > 4 && predictions.length > 0" class="mt-8">
-        <div class="bg-white rounded-lg shadow-lg p-6">
+        <div v-if="!isLoading && playedWeeks >= 4" class="bg-white rounded-lg shadow-lg p-6">
           <h2 class="text-2xl font-semibold mb-4">Championship Predictions</h2>
-          <Predictions :predictions="predictions" />
+          <div v-if="predictions.length === 0" class="text-gray-500 text-center py-4">
+            Calculating predictions...
+          </div>
+          <Predictions v-else :predictions="predictions" />
         </div>
       </div>
 
-      <!-- Control Buttons -->
+      <div v-if="simulatingWeek" class="mt-8 text-center">
+        <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
+          <p class="font-semibold">Simulating Week {{ simulatingWeek }}...</p>
+        </div>
+      </div>
+
       <div class="mt-8 flex justify-center space-x-4">
         <button
           @click="simulateWeek"
@@ -105,10 +110,27 @@ export default {
     const totalWeeks = ref(6);
     const allMatchesPlayed = ref(false);
     const displayWeek = ref(1);
+    const isLoading = ref(false);
+    const simulatingWeek = ref(null);
 
     const currentWeekMatches = computed(() => {
       if (!Array.isArray(matches.value)) return [];
       return matches.value.filter(match => match?.week === displayWeek.value);
+    });
+
+    const playedWeeks = computed(() => {
+      if (!Array.isArray(matches.value)) return 0;
+      let highestPlayedWeek = 0;
+      for (let week = 1; week <= 6; week++) {
+        const weekMatches = matches.value.filter(match => match?.week === week);
+        const playedInWeek = weekMatches.filter(match => match?.played).length;
+        if (weekMatches.length > 0 && playedInWeek === weekMatches.length) {
+          highestPlayedWeek = week;
+        } else {
+          break;
+        }
+      }
+      return highestPlayedWeek;
     });
 
     const fetchStandings = async () => {
@@ -160,25 +182,49 @@ export default {
 
     const simulateWeek = async () => {
       try {
+        isLoading.value = true;
         await axios.post('/api/simulate-week');
         await fetchAll();
       } catch (error) {
         console.error('Error simulating week:', error);
+      } finally {
+        isLoading.value = false;
       }
     };
 
     const simulateAll = async () => {
       try {
-        await axios.post('/api/simulate-all');
-        await fetchAll();
+        isLoading.value = true;
+
+        const weekData = await axios.get('/api/current-week');
+        let currentSimWeek = weekData.data.data.current_week;
+        const totalWeeks = weekData.data.data.total_weeks;
+
+        while (currentSimWeek <= totalWeeks) {
+          const matchesResponse = await axios.get(`/api/matches?week=${currentSimWeek}`);
+          const weekMatches = matchesResponse.data.data || [];
+          const unplayedMatches = weekMatches.filter(match => !match.played);
+
+          if (unplayedMatches.length > 0) {
+            simulatingWeek.value = currentSimWeek;
+            await axios.post('/api/simulate-week', { week: currentSimWeek });
+            await fetchAll();
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+
+          currentSimWeek++;
+        }
       } catch (error) {
         console.error('Error simulating all matches:', error);
+      } finally {
+        isLoading.value = false;
+        simulatingWeek.value = null;
       }
     };
 
     const resetLeague = async () => {
       if (!confirm('Are you sure you want to reset the league?')) return;
-      
+
       try {
         await axios.post('/api/reset-league');
         await fetchAll();
@@ -209,10 +255,10 @@ export default {
     };
 
     const fetchAll = async () => {
+      await fetchCurrentWeek();
       await Promise.all([
         fetchStandings(),
         fetchMatches(),
-        fetchCurrentWeek(),
         fetchPredictions()
       ]);
     };
@@ -221,8 +267,10 @@ export default {
       fetchAll();
     });
 
-    watch(currentWeek, () => {
-      fetchPredictions();
+    watch(playedWeeks, (newPlayedWeeks) => {
+      if (newPlayedWeeks >= 4) {
+        fetchPredictions();
+      }
     });
 
     return {
@@ -234,6 +282,9 @@ export default {
       allMatchesPlayed,
       displayWeek,
       currentWeekMatches,
+      playedWeeks,
+      isLoading,
+      simulatingWeek,
       simulateWeek,
       simulateAll,
       resetLeague,
